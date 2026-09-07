@@ -4,13 +4,13 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
+  # إعادة تشغيل البوت تلقائياً كل 6 ساعات
+  schedule:
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 jobs:
-  build-and-test:
+  run-bot:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,6 +25,6 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Run Linter / Tests
-        run: |
-          npm test --if-present
+      - name: Run Bot with Timeout
+        # يتوقف البوت تلقائياً بعد 5 ساعات و 30 دقيقة ليسمح للجلسة التالية بالبدء
+        run: timeout 5.5h npm start || true

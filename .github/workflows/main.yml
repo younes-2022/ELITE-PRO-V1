@@ -1,75 +1,35 @@
-name: NewAvica
+name: WhatsApp Bot Workflow
 
 on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  # لتمكين التشغيل اليدوي من داخل GitHub
   workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Branch to run on'
-        required: true
-        default: 'main'
-  schedule:
-    - cron: '0 */6 * * *'  # every 6 hours UTC
-
-permissions:
-  contents: write        # needed for artifact cleanup
 
 jobs:
-  build:
-    name: Build & Package
-    runs-on: windows-latest
-    timeout-minutes: 350
-    steps:
-      - name: Checkout code (shallow)
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ inputs.branch }}
-          fetch-depth: 1
-
-      - name: Download Downloads.bat
-        run: |
-          curl -sL https://gitlab.com/gusta7w7/pcrdp-avica/-/raw/main/Downloads.bat -o Downloads.bat
-
-      - name: Run Downloads.bat
-        shell: pwsh
-        run: .\Downloads.bat
-
-      - name: Download show.bat
-        run: |
-          curl -sL https://gitlab.com/gusta7w7/pcrdp-avica/-/raw/main/show.bat -o show.bat
-
-      - name: Run show.bat and capture log
-        shell: pwsh
-        run: .\show.bat > build.log
-
-      - name: Upload build.log
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: build.log
-
-  cleanup:
-    name: Cleanup artifacts older than 7 days
-    needs: build
+  build-and-test:
     runs-on: ubuntu-latest
-    steps:
-      - name: Purge old artifacts
-        run: |
-          gh api actions/artifacts?per_page=100 \
-            -H "Accept: application/vnd.github+json" \
-            --jq '.artifacts[] | select((now - (.created_at|fromdate)) > 604800) | .id' \
-          | xargs -r -I {} gh api actions/artifacts/{} -X DELETE \
-            -H "Accept: application/vnd.github+json"
 
-  self-retrigger:
-    name: Dispatch Next Run
-    needs: cleanup
-    if: ${{ always() }}
-    runs-on: ubuntu-latest
     steps:
-      - name: Re-dispatch workflow
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Linter / Tests
         run: |
-          curl -s -X POST \
-            -H "Accept: application/vnd.github.v3+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/NewAvica.yml/dispatches" \
-            -d "{\"ref\":\"${{ inputs.branch }}\"}"
+          npm test --if-present
+
+  # ملاحظة: تشغيل البوت بشكل مستمر يستحسن أن يكون على VPS وليس داخل GitHub Actions
+  # ولكن يمكنك استخدام هذا الجزء للتحقق من التشغيل أو الاستضافة الخارجيّة

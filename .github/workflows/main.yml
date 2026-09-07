@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-  # إعادة تشغيل البوت تلقائياً كل 6 ساعات
   schedule:
     - cron: '0 */6 * * *'
   workflow_dispatch:
@@ -26,5 +25,6 @@ jobs:
         run: npm install
 
       - name: Run Bot with Timeout
-        # يتوقف البوت تلقائياً بعد 5 ساعات و 30 دقيقة ليسمح للجلسة التالية بالبدء
+        env:
+          SESSION_ID: ${{ secrets.SESSION_ID }}
         run: timeout 5.5h npm start || true

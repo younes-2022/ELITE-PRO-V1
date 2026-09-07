@@ -7,7 +7,6 @@ on:
   pull_request:
     branches:
       - main
-  # لتمكين التشغيل اليدوي من داخل GitHub
   workflow_dispatch:
 
 jobs:
@@ -21,15 +20,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-node-version: '20'
-          cache: 'npm'
+          node-version: '20'
 
       - name: Install Dependencies
-        run: npm ci
+        run: npm install
 
       - name: Run Linter / Tests
         run: |
           npm test --if-present
-
-  # ملاحظة: تشغيل البوت بشكل مستمر يستحسن أن يكون على VPS وليس داخل GitHub Actions
-  # ولكن يمكنك استخدام هذا الجزء للتحقق من التشغيل أو الاستضافة الخارجيّة

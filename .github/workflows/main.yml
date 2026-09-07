@@ -2,33 +2,56 @@ name: Node.js CI/CD Workflow
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main, master ]
   pull_request:
-    branches:
-      - main
-  # شغل الـ Workflow كل 6 ساعات أوتوماتيكياً
-  schedule:
-    - cron: '0 */6 * * *'
+    branches: [ main, master ]
 
 jobs:
-  build:
+  # ---------------------------------------------------
+  # 1. Continuous Integration (CI) - Build & Test
+  # ---------------------------------------------------
+  build-and-test:
     runs-on: ubuntu-latest
+
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [18.x, 20.x]
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm' # كايسرّع التيليشارجمون ديال npm packages
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install Dependencies
+        run: npm ci
 
-    - name: Run tests
-      run: npm test
+      - name: Run Linter (Optional)
+        run: npm run lint --if-present
+
+      - name: Run Tests
+        run: npm test
+
+      - name: Build Project
+        run: npm run build --if-present
+
+  # ---------------------------------------------------
+  # 2. Continuous Deployment (CD) - Automatic Deploy
+  # ---------------------------------------------------
+  deploy:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploying to Server
+        run: |
+          echo "جاري الـ Deploy لنظام الإنتاج (Production)..."
+          # دير هنا الأوامر ديال Deploy (مثلا: Docker push, AWS, Vercel, Heroku, SSH...)

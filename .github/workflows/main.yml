@@ -1,0 +1,78 @@
+name: Node.js CI/CD Workflow (main)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+# Cancel in-progress runs if a new commit is pushed to the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================
+  # STAGE 1: Lint, Test & Build
+  # ============================
+  build-and-test:
+    name: Build & Test (Node.js ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/actions-setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm' # Caches npm dependencies to speed up workflow
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Linter
+        run: npm run lint --if-present
+
+      - name: Run Tests
+        run: npm test --if-present
+
+      - name: Build Application
+        run: npm run build --if-present
+
+  # ============================
+  # STAGE 2: Deployment
+  # ============================
+  deploy:
+    name: Deploy to Production
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/actions-setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install production dependencies only
+        run: npm ci --omit=dev
+
+      # Replace this step with your actual deployment logic
+      # (e.g., Docker, AWS EC2, Vercel, Heroku, SSH to VPS)
+      - name: Run deployment script
+        env:
+          NODE_ENV: production
+          # MY_SECRET_KEY: ${{ secrets.MY_SECRET_KEY }}
+        run: |
+          echo "Deploying to production server..."
+          # Add your deployment commands here
